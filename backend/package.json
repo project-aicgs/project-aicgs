@@ -1,12 +1,11 @@
 {
-  "name": "my-agent-wheel-backend",
-  "version": "0.0.0",
-  "type": "module",
-  "scripts": {
+    "name": "my-agent-wheel-backend",
+    "version": "0.0.0",
+    "scripts": {
       "start": "node server.js",
       "dev": "nodemon server.js"
-  },
-  "dependencies": {
+    },
+    "dependencies": {
       "connect-mongo": "^5.1.0",
       "cors": "^2.8.5",
       "dotenv": "^16.4.1",
@@ -16,8 +15,9 @@
       "mongoose": "^8.1.1",
       "passport": "^0.7.0",
       "passport-discord": "^0.1.4"
-  },
-  "devDependencies": {
+    },
+    "devDependencies": {
+      "nodemon": "^3.0.3",
       "concurrently": "^8.2.2"
+    }
   }
-}
