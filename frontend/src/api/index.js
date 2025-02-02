@@ -1,6 +1,6 @@
 // api/index.js
 const API_URL = 'https://project-aicgs.onrender.com/api';
-const CLIENT_URL = 'http://localhost:5173';
+const CLIENT_URL = 'https://aicgs.netlify.app';
 
 export const fetchAuthStatus = async () => {
   try {
