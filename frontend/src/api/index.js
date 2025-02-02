@@ -1,5 +1,5 @@
 // api/index.js
-const API_URL = 'http://localhost:5000/api';
+const API_URL = 'https://project-aicgs.onrender.com/api';
 const CLIENT_URL = 'http://localhost:5173';
 
 export const fetchAuthStatus = async () => {
