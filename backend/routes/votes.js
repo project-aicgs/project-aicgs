@@ -1,4 +1,3 @@
-// Then, update your votes route (routes/votes.js) to include trait stats:
 const express = require('express');
 const router = express.Router();
 const Vote = require('../models/Vote');
@@ -11,6 +10,7 @@ const getUserVoteCount = async (userId) => {
     const count = await Vote.countDocuments({ userId: userId });
     return count;
   } catch (err) {
+    console.error('Error in getUserVoteCount:', err);
     throw new Error('Failed to get vote count');
   }
 };
@@ -18,7 +18,9 @@ const getUserVoteCount = async (userId) => {
 // Get trait voting statistics
 router.get('/trait-stats/:agentId', async (req, res) => {
   try {
+    console.log('Fetching trait stats for agent:', req.params.agentId);
     const votes = await Vote.find({ agentId: req.params.agentId });
+    console.log('Found votes:', votes);
     const traitStats = {};
     
     votes.forEach(vote => {
@@ -32,6 +34,7 @@ router.get('/trait-stats/:agentId', async (req, res) => {
 
     res.json({ traitStats });
   } catch (err) {
+    console.error('Error in trait-stats:', err);
     res.status(500).json({ message: err.message });
   }
 });
@@ -46,9 +49,16 @@ const isAuthenticated = (req, res, next) => {
 
 router.get('/stats', async (req, res) => {
   try {
+    console.log('Fetching vote stats');
     const totalVotes = await Vote.countDocuments();
-    res.json({ totalVotes });
+    const uniqueVoters = await Vote.distinct('userId').then(users => users.length);
+    console.log('Stats:', { totalVotes, uniqueVoters });
+    res.json({ 
+      totalVotes,
+      uniqueVoters
+    });
   } catch (err) {
+    console.error('Error in /stats:', err);
     res.status(500).json({ message: err.message });
   }
 });
@@ -59,6 +69,7 @@ router.get('/remaining', isAuthenticated, async (req, res) => {
     const remainingVotes = 100 - userVoteCount;
     res.json({ remainingVotes });
   } catch (err) {
+    console.error('Error in /remaining:', err);
     res.status(500).json({ message: err.message });
   }
 });
@@ -149,23 +160,6 @@ router.post('/', isAuthenticated, async (req, res) => {
       });
     });
 
-    // Add this route to your existing votes.js
-router.get('/stats', async (req, res) => {
-  try {
-    const totalVotes = await Vote.countDocuments();
-    
-    // Count unique voters by getting distinct userId values
-    const uniqueVoters = await Vote.distinct('userId').then(users => users.length);
-    
-    res.json({ 
-      totalVotes,
-      uniqueVoters
-    });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-});
-
     const remainingVotes = 100 - (userVoteCount + 1);
 
     res.status(201).json({ 
@@ -175,7 +169,8 @@ router.get('/stats', async (req, res) => {
       traitStats
     });
   } catch (err) {
-    res.status(400).json({ message: err.message });
+    console.error('Error in vote creation:', err);
+    res.status(500).json({ message: err.message });
   }
 });
 
