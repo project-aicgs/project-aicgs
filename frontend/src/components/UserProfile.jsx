@@ -6,7 +6,7 @@ const UserProfile = ({ user, onLogout }) => {
     // Show a login button if no user is authenticated
     return (
       <button
-        onClick={() => window.location.href = 'http://localhost:5000/api/auth/discord'}
+        onClick={() => window.location.href = 'https://project-aicgs.onrender.com/api/auth/discord'}
         style={{
           background: 'rgba(88, 101, 242, 0.2)',
           border: 'none',

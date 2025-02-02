@@ -56,15 +56,14 @@ router.get('/discord', passport.authenticate('discord'));
 
 router.get('/discord/callback', 
   passport.authenticate('discord', {
-    failureRedirect: 'http://localhost:5173'
+    failureRedirect: 'https://aicgs.netlify.app'
   }),
   (req, res) => {
     // Successful authentication, redirect to frontend
-    res.redirect('http://localhost:5173/?showVoting=true');
+    res.redirect('https://aicgs.netlify.app/?showVoting=true');
   }
 );
 
-// In auth.js
 router.get('/status', (req, res) => {
   console.log('Auth status check:', req.isAuthenticated(), req.user); // Debug log
   if (req.isAuthenticated()) {
@@ -92,7 +91,7 @@ router.get('/logout', (req, res) => {
         return res.status(500).json({ message: 'Error destroying session' });
       }
       // Redirect to frontend after successful logout
-      res.redirect('http://localhost:5173');
+      res.redirect('https://aicgs.netlify.app');
     });
   });
 });

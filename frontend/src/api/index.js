@@ -16,7 +16,9 @@ export const fetchAuthStatus = async () => {
 
 export const fetchAgents = async () => {
   try {
-    const response = await fetch(`${API_URL}/agents`);
+    const response = await fetch(`${API_URL}/agents`, {
+      credentials: 'include'
+    });
     if (!response.ok) {
       throw new Error(`Failed to fetch agents: ${response.status}`);
     }
