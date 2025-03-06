@@ -151,6 +151,9 @@ const AIInterface = () => {
     voting: agents.filter(agent => agent.status === 'Conducting Community Sentiment Analysis'),
     migrating: agents.filter(agent => agent.status === 'Agent Migration Processing')
   };
+  const authBaseUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+  ? 'http://localhost:5000'
+  : 'https://project-aicgs.onrender.com';
 
   // Check URL parameters for voting page display
   useEffect(() => {
@@ -341,7 +344,7 @@ const AIInterface = () => {
         <UserProfile 
           user={authStatus?.user}
           onLogout={() => {
-            window.location.href = 'http://localhost:5000/api/auth/logout';
+            window.location.href = `${authBaseUrl}/api/auth/logout`;
           }}
         />
       </nav>

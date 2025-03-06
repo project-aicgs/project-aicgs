@@ -1,6 +1,7 @@
 // api/index.js
-const API_URL = 'https://project-aicgs.onrender.com/api';
-const CLIENT_URL = 'https://aicgs.netlify.app';
+const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+  ? 'http://localhost:5000/api'
+  : 'https://project-aicgs.onrender.com/api';
 
 export const fetchAuthStatus = async () => {
   try {
@@ -13,7 +14,6 @@ export const fetchAuthStatus = async () => {
     return { isAuthenticated: false, user: null };
   }
 };
-
 export const fetchAgents = async () => {
   try {
     const response = await fetch(`${API_URL}/agents`, {

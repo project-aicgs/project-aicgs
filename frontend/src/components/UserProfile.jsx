@@ -2,11 +2,14 @@ import React from 'react';
 import { LogOut } from 'lucide-react';
 
 const UserProfile = ({ user, onLogout }) => {
+  const authBaseUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+  ? 'http://localhost:5000'
+  : 'https://project-aicgs.onrender.com';
   if (!user) {
     // Show a login button if no user is authenticated
     return (
       <button
-        onClick={() => window.location.href = 'https://project-aicgs.onrender.com/api/auth/discord'}
+        onClick={() => window.location.href = `${authBaseUrl}/api/auth/discord`}
         style={{
           background: 'rgba(88, 101, 242, 0.2)',
           border: 'none',
