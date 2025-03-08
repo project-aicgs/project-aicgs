@@ -6,7 +6,11 @@ const MongoStore = require('connect-mongo');
 const passport = require('passport');
 const activityRoutes = require('./routes/activities');
 require('dotenv').config();
-
+// Add JWT secret validation
+if (!process.env.JWT_SECRET) {
+  console.warn('WARNING: JWT_SECRET is not set. Using a default secret. This is insecure for production.');
+  process.env.JWT_SECRET = 'Gr3ys0nd4g0d@';
+}
 // Create Express app
 const app = express();
 

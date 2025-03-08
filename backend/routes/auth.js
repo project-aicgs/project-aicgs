@@ -1,7 +1,10 @@
 const express = require('express');
 const passport = require('passport');
 const DiscordStrategy = require('passport-discord').Strategy;
+const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const User = require('../models/User');
+const Token = require('../models/Token');
 const router = express.Router();
 
 // Passport setup
@@ -23,10 +26,9 @@ passport.use(new DiscordStrategy({
     clientID: process.env.DISCORD_CLIENT_ID,
     clientSecret: process.env.DISCORD_CLIENT_SECRET,
     callbackURL: process.env.DISCORD_CALLBACK_URL,
-    scope: ['identify', 'email'],
-    passReqToCallback: true
+    scope: ['identify', 'email']
   },
-  async (req, accessToken, refreshToken, profile, done) => {
+  async (accessToken, refreshToken, profile, done) => {
     try {
       console.log('Discord auth callback received for user:', profile.username);
       let user = await User.findOne({ discordId: profile.id });
@@ -56,7 +58,30 @@ passport.use(new DiscordStrategy({
   }
 ));
 
-// Save the return URL when initiating Discord auth - with additional logging
+// Generate authentication token
+const generateToken = async (userId) => {
+  // Generate a random token
+  const randomToken = crypto.randomBytes(32).toString('hex');
+  
+  // Save the token in the database
+  const tokenDoc = new Token({
+    userId,
+    token: randomToken
+  });
+  
+  await tokenDoc.save();
+  
+  // Create a JWT that contains the token reference
+  const token = jwt.sign(
+    { userId, tokenId: tokenDoc._id },
+    process.env.JWT_SECRET || 'your-secret-key',
+    { expiresIn: '7d' }
+  );
+  
+  return token;
+};
+
+// Save the return URL when initiating Discord auth
 router.get('/discord', (req, res, next) => {
   // Get the redirectUrl from query parameters
   const redirectUrl = req.query.redirect || 'https://aicgs.netlify.app';
@@ -64,9 +89,8 @@ router.get('/discord', (req, res, next) => {
   // Store the redirect URL in the session
   req.session.returnTo = redirectUrl;
   console.log("Setting returnTo URL in session:", redirectUrl);
-  console.log("Session ID:", req.session.id);
   
-  // Force session save before redirecting to ensure it's available after auth
+  // Force session save before redirecting
   req.session.save((err) => {
     if (err) {
       console.error("Error saving session before auth:", err);
@@ -78,89 +102,175 @@ router.get('/discord', (req, res, next) => {
   });
 });
 
-// After successful authentication, redirect to the saved URL - with enhanced error handling
+// After successful authentication, redirect with token
 router.get('/discord/callback', 
   passport.authenticate('discord', {
     failureRedirect: 'https://aicgs.netlify.app?authError=true'
   }),
-  (req, res) => {
-    console.log("Discord auth callback successful for user:", req.user ? req.user.username : "unknown");
-    console.log("Session ID:", req.session.id);
-    
-    // Get the return URL from session
-    const returnTo = req.session.returnTo || 'https://aicgs.netlify.app';
-    console.log("Redirecting to:", returnTo);
-    
-    // Clear the returnTo from session
-    delete req.session.returnTo;
-    
-    // Make sure to save session changes before redirecting
-    req.session.save((err) => {
-      if (err) {
-        console.error("Error saving session after auth:", err);
-        return res.redirect('https://aicgs.netlify.app?authError=sessionSave');
-      }
+  async (req, res) => {
+    try {
+      console.log("Discord auth callback successful for user:", req.user.username);
       
-      // Add cache-busting parameter to prevent browser caching
+      // Generate token for the authenticated user
+      const token = await generateToken(req.user.id);
+      
+      // Get the return URL from session
+      const returnTo = req.session.returnTo || 'https://aicgs.netlify.app';
+      console.log("Redirecting to:", returnTo);
+      
+      // Clear the returnTo from session
+      delete req.session.returnTo;
+      
+      // Construct redirect URL with token
       const redirectUrl = new URL(returnTo);
-      redirectUrl.searchParams.set('t', Date.now().toString());
+      redirectUrl.searchParams.set('token', token);
+      redirectUrl.searchParams.set('t', Date.now().toString()); // Cache buster
       
       res.redirect(redirectUrl.toString());
-    });
+    } catch (error) {
+      console.error("Error generating token:", error);
+      res.redirect('https://aicgs.netlify.app?authError=tokenGeneration');
+    }
   }
 );
 
-// Auth status endpoint with enhanced logging and error handling
-router.get('/status', (req, res) => {
-  console.log('Auth status check:');
-  console.log('- isAuthenticated:', req.isAuthenticated());
-  console.log('- User ID:', req.user ? req.user.id : 'none');
-  console.log('- Session ID:', req.session.id || 'no session');
-  
-  // Return detailed status for debugging
-  if (req.isAuthenticated()) {
+// Verify token and get user
+router.post('/verify-token', async (req, res) => {
+  try {
+    const { token } = req.body;
+    
+    if (!token) {
+      return res.status(401).json({ 
+        isAuthenticated: false, 
+        message: 'No token provided' 
+      });
+    }
+    
+    // Verify the JWT
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+    
+    // Check if the token exists in the database
+    const tokenDoc = await Token.findById(decoded.tokenId);
+    if (!tokenDoc) {
+      return res.status(401).json({ 
+        isAuthenticated: false, 
+        message: 'Invalid token' 
+      });
+    }
+    
+    // Get the user
+    const user = await User.findById(decoded.userId);
+    if (!user) {
+      return res.status(401).json({ 
+        isAuthenticated: false, 
+        message: 'User not found' 
+      });
+    }
+    
+    // Return user info
     res.json({
       isAuthenticated: true,
-      user: req.user,
-      sessionActive: true
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        avatar: user.avatar,
+        discordId: user.discordId
+      }
     });
-  } else {
-    // Check if session exists but no user
-    const hasSession = !!req.session && !!req.session.id;
-    
-    res.json({
-      isAuthenticated: false,
-      user: null,
-      sessionActive: hasSession
+  } catch (error) {
+    console.error("Token verification error:", error);
+    res.status(401).json({ 
+      isAuthenticated: false, 
+      message: 'Invalid or expired token' 
     });
   }
 });
 
-// Logout route with enhanced error handling
-router.get('/logout', (req, res) => {
-  console.log("Logging out user:", req.user ? req.user.username : "Unknown");
+// Auth status endpoint
+router.get('/status', async (req, res) => {
+  // Check for Authorization header
+  const authHeader = req.headers.authorization;
   
-  // First destroy the session
-  req.session.destroy((err) => {
-    if (err) {
-      console.error("Error destroying session:", err);
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.substring(7);
+    
+    try {
+      // Verify the JWT
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+      
+      // Check if the token exists in the database
+      const tokenDoc = await Token.findById(decoded.tokenId);
+      if (!tokenDoc) {
+        return res.json({ isAuthenticated: false, user: null });
+      }
+      
+      // Get the user
+      const user = await User.findById(decoded.userId);
+      if (!user) {
+        return res.json({ isAuthenticated: false, user: null });
+      }
+      
+      // User is authenticated
+      return res.json({
+        isAuthenticated: true,
+        user: {
+          id: user._id,
+          username: user.username,
+          email: user.email,
+          avatar: user.avatar,
+          discordId: user.discordId
+        }
+      });
+    } catch (error) {
+      console.error("Token verification error:", error);
+      return res.json({ isAuthenticated: false, user: null });
     }
-    
-    // Clear the cookie - even if there was an error with the session
-    res.clearCookie('connect.sid', {
-      path: '/',
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
+  } else if (req.isAuthenticated()) {
+    // Traditional session authentication (fallback)
+    return res.json({
+      isAuthenticated: true,
+      user: req.user
     });
+  } else {
+    // Not authenticated
+    return res.json({
+      isAuthenticated: false,
+      user: null
+    });
+  }
+});
+
+// Logout route
+router.post('/logout', async (req, res) => {
+  // Check for Authorization header
+  const authHeader = req.headers.authorization;
+  
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.substring(7);
     
-    // Then redirect to the frontend
-    const redirectUrl = process.env.NODE_ENV === 'production'
-      ? 'https://aicgs.netlify.app?loggedOut=true'
-      : 'http://localhost:5173?loggedOut=true';
-    
-    res.redirect(redirectUrl);
-  });
+    try {
+      // Verify the JWT
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+      
+      // Delete the token from the database
+      await Token.findByIdAndDelete(decoded.tokenId);
+      
+      res.json({ success: true, message: 'Logged out successfully' });
+    } catch (error) {
+      console.error("Logout error:", error);
+      res.json({ success: true, message: 'Logged out successfully' });
+    }
+  } else {
+    // Traditional session logout (fallback)
+    req.logout((err) => {
+      if (err) {
+        console.error("Error during logout:", err);
+      }
+      
+      res.json({ success: true, message: 'Logged out successfully' });
+    });
+  }
 });
 
 module.exports = router;

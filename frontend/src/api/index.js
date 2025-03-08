@@ -1,19 +1,60 @@
-// api/index.js
+// api/index.js - Updated for Token-based Authentication
 // Dynamic API URL based on environment
 const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
   ? 'http://localhost:5000/api'
   : 'https://project-aicgs.onrender.com/api';
 
-// Helper for consistent fetch error handling
-const fetchWithCredentials = async (url, options = {}) => {
+// Token storage management
+const TOKEN_KEY = 'aicgs_auth_token';
+
+// Store the authentication token
+export const setAuthToken = (token) => {
+  if (token) {
+    localStorage.setItem(TOKEN_KEY, token);
+  } else {
+    localStorage.removeItem(TOKEN_KEY);
+  }
+};
+
+// Get the stored authentication token
+export const getAuthToken = () => {
+  return localStorage.getItem(TOKEN_KEY);
+};
+
+// Check URL for token parameter and store it if present
+export const checkURLForToken = () => {
+  const urlParams = new URLSearchParams(window.location.search);
+  const token = urlParams.get('token');
+  
+  if (token) {
+    setAuthToken(token);
+    
+    // Clean up URL
+    const newUrl = window.location.pathname + 
+      (urlParams.toString() ? '?' + urlParams.toString().replace(/token=[^&]*(&|$)/, '') : '');
+    
+    window.history.replaceState({}, document.title, newUrl);
+    return true;
+  }
+  
+  return false;
+};
+
+// Helper for consistent fetch error handling with token auth
+const fetchWithAuth = async (url, options = {}) => {
+  const token = getAuthToken();
+  
   const defaultOptions = {
-    credentials: 'include',
     headers: {
       'Accept': 'application/json',
       'Content-Type': 'application/json',
-      // Removed Cache-Control header as it's causing CORS issues
     },
   };
+  
+  // Add authentication token if available
+  if (token) {
+    defaultOptions.headers['Authorization'] = `Bearer ${token}`;
+  }
 
   const fetchOptions = {
     ...defaultOptions,
@@ -28,11 +69,17 @@ const fetchWithCredentials = async (url, options = {}) => {
     console.log(`Fetching: ${url}`);
     const response = await fetch(url, fetchOptions);
     
-    // Check for redirect response
-    if (response.redirected) {
-      console.log(`Redirected to: ${response.url}`);
-      window.location.href = response.url;
-      return null;
+    // Check for unauthorized status
+    if (response.status === 401) {
+      // Clear invalid token
+      setAuthToken(null);
+      
+      // Return auth error
+      return { 
+        authError: true, 
+        message: 'Authentication required',
+        redirectTo: `${API_URL.replace('/api', '')}/api/auth/discord?redirect=${encodeURIComponent(window.location.href)}&t=${Date.now()}`
+      };
     }
     
     // If not JSON response, handle differently
@@ -62,20 +109,83 @@ const fetchWithCredentials = async (url, options = {}) => {
   }
 };
 
+export const verifyToken = async () => {
+  const token = getAuthToken();
+  
+  if (!token) {
+    return { isAuthenticated: false, user: null };
+  }
+  
+  try {
+    const data = await fetchWithAuth(`${API_URL}/auth/verify-token`, {
+      method: 'POST',
+      body: JSON.stringify({ token }),
+    });
+    
+    // Check for auth error response
+    if (data.authError) {
+      setAuthToken(null);
+      return { isAuthenticated: false, user: null };
+    }
+    
+    return data;
+  } catch (error) {
+    console.error('Error verifying token:', error);
+    setAuthToken(null);
+    return { isAuthenticated: false, user: null };
+  }
+};
+
 export const fetchAuthStatus = async () => {
   try {
-    const data = await fetchWithCredentials(`${API_URL}/auth/status`);
+    // Check URL for token first
+    const hasNewToken = checkURLForToken();
+    
+    // If we just got a new token, verify it
+    if (hasNewToken) {
+      return await verifyToken();
+    }
+    
+    // Otherwise check current auth status
+    const data = await fetchWithAuth(`${API_URL}/auth/status`);
+    
+    // Check for auth error response
+    if (data.authError) {
+      return { isAuthenticated: false, user: null };
+    }
+    
     console.log("Auth status response:", data);
-    return data || { isAuthenticated: false, user: null };
+    return data;
   } catch (error) {
     console.error('Error fetching auth status:', error);
     return { isAuthenticated: false, user: null };
   }
 };
 
+export const logout = async () => {
+  const token = getAuthToken();
+  
+  try {
+    await fetchWithAuth(`${API_URL}/auth/logout`, {
+      method: 'POST',
+    });
+  } catch (error) {
+    console.error('Error during logout:', error);
+  } finally {
+    // Always clear local token regardless of server response
+    setAuthToken(null);
+  }
+};
+
 export const fetchAgents = async () => {
   try {
-    const data = await fetchWithCredentials(`${API_URL}/agents`);
+    const data = await fetchWithAuth(`${API_URL}/agents`);
+    
+    // Check for auth error response
+    if (data.authError) {
+      return [];
+    }
+    
     return data || [];
   } catch (error) {
     console.error('Error fetching agents:', error);
@@ -85,7 +195,13 @@ export const fetchAgents = async () => {
 
 export const fetchRecentActivities = async () => {
   try {
-    const data = await fetchWithCredentials(`${API_URL}/activities/recent`);
+    const data = await fetchWithAuth(`${API_URL}/activities/recent`);
+    
+    // Check for auth error response
+    if (data.authError) {
+      return [];
+    }
+    
     return data || [];
   } catch (error) {
     console.error('Error fetching activities:', error);
@@ -95,7 +211,13 @@ export const fetchRecentActivities = async () => {
 
 export const fetchTraitStats = async (agentId) => {
   try {
-    const data = await fetchWithCredentials(`${API_URL}/votes/trait-stats/${agentId}`);
+    const data = await fetchWithAuth(`${API_URL}/votes/trait-stats/${agentId}`);
+    
+    // Check for auth error response
+    if (data.authError) {
+      return { traitStats: {} };
+    }
+    
     return data || { traitStats: {} };
   } catch (error) {
     console.error('Error fetching trait stats:', error);
@@ -105,21 +227,29 @@ export const fetchTraitStats = async (agentId) => {
 
 export const getRemainingVotes = async () => {
   try {
-    const data = await fetchWithCredentials(`${API_URL}/votes/remaining`);
-    return data || { remainingVotes: 0 };
-  } catch (error) {
-    // For 401 errors, just return 0 as the user isn't authenticated
-    if (error.status === 401) {
+    const data = await fetchWithAuth(`${API_URL}/votes/remaining`);
+    
+    // Check for auth error response
+    if (data.authError) {
       return { remainingVotes: 0 };
     }
+    
+    return data || { remainingVotes: 0 };
+  } catch (error) {
     console.error('Error fetching remaining votes:', error);
-    throw error;
+    return { remainingVotes: 0 };
   }
 };
 
 export const fetchStats = async () => {
   try {
-    const data = await fetchWithCredentials(`${API_URL}/votes/stats`);
+    const data = await fetchWithAuth(`${API_URL}/votes/stats`);
+    
+    // Check for auth error response
+    if (data.authError) {
+      return { totalVotes: 0, uniqueVoters: 0 };
+    }
+    
     return data || { totalVotes: 0, uniqueVoters: 0 };
   } catch (error) {
     console.error('Error fetching stats:', error);
@@ -129,7 +259,7 @@ export const fetchStats = async () => {
 
 export const castVote = async (agentId, selectedTraits) => {
   try {
-    const data = await fetchWithCredentials(`${API_URL}/votes`, {
+    const data = await fetchWithAuth(`${API_URL}/votes`, {
       method: 'POST',
       body: JSON.stringify({
         agentId,
@@ -137,20 +267,24 @@ export const castVote = async (agentId, selectedTraits) => {
       }),
     });
     
-    // If we get redirected (for auth), the fetchWithCredentials will handle it
-    if (!data) return null;
+    // Check for auth error response
+    if (data.authError) {
+      // Redirect to login
+      window.location.href = data.redirectTo;
+      return null;
+    }
     
     return data;
   } catch (error) {
     console.error('Error in castVote:', error);
     
-    // Handle 401 authentication errors specially
+    // If the error is an auth error (401), redirect to login
     if (error.status === 401) {
       const authBaseUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
         ? 'http://localhost:5000'
         : 'https://project-aicgs.onrender.com';
         
-      window.location.href = `${authBaseUrl}/api/auth/discord?redirect=https://aicgs.netlify.app/?showVoting=true&t=${Date.now()}`;
+      window.location.href = `${authBaseUrl}/api/auth/discord?redirect=${encodeURIComponent(window.location.href)}&t=${Date.now()}`;
       return null;
     }
     

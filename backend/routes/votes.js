@@ -3,6 +3,8 @@ const router = express.Router();
 const Vote = require('../models/Vote');
 const Agent = require('../models/Agent');
 const Activity = require('../models/Activity');
+const jwt = require('jsonwebtoken');
+const Token = require('../models/Token');
 
 // Helper function to count user votes
 const getUserVoteCount = async (userId) => {
@@ -40,17 +42,59 @@ router.get('/trait-stats/:agentId', async (req, res) => {
 });
 
 // Middleware to check if user is authenticated
-const isAuthenticated = (req, res, next) => {
-  if (req.isAuthenticated()) {
-    return next();
-  }
+const isAuthenticated = async (req, res, next) => {
+  // Check for Authorization header
+  const authHeader = req.headers.authorization;
   
-  // Enhanced error response with more details
-  res.status(401).json({ 
-    message: 'Authentication required',
-    code: 'AUTH_REQUIRED',
-    redirectTo: 'https://project-aicgs.onrender.com/api/auth/discord?redirect=https://aicgs.netlify.app/?showVoting=true&t=' + Date.now()
-  });
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.substring(7);
+    
+    try {
+      // Verify the JWT
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+      
+      // Check if the token exists in the database
+      const tokenDoc = await Token.findById(decoded.tokenId);
+      if (!tokenDoc) {
+        return res.status(401).json({ 
+          message: 'Authentication required',
+          code: 'AUTH_REQUIRED',
+          redirectTo: 'https://project-aicgs.onrender.com/api/auth/discord?redirect=https://aicgs.netlify.app/?showVoting=true&t=' + Date.now()
+        });
+      }
+      
+      // Get the user
+      const user = await User.findById(decoded.userId);
+      if (!user) {
+        return res.status(401).json({ 
+          message: 'Authentication required',
+          code: 'AUTH_REQUIRED',
+          redirectTo: 'https://project-aicgs.onrender.com/api/auth/discord?redirect=https://aicgs.netlify.app/?showVoting=true&t=' + Date.now()
+        });
+      }
+      
+      // Attach user to request
+      req.user = user;
+      return next();
+    } catch (error) {
+      console.error("Token verification error:", error);
+      return res.status(401).json({ 
+        message: 'Authentication required',
+        code: 'AUTH_REQUIRED',
+        redirectTo: 'https://project-aicgs.onrender.com/api/auth/discord?redirect=https://aicgs.netlify.app/?showVoting=true&t=' + Date.now()
+      });
+    }
+  } else if (req.isAuthenticated()) {
+    // Traditional session authentication (fallback)
+    return next();
+  } else {
+    // Not authenticated
+    return res.status(401).json({ 
+      message: 'Authentication required',
+      code: 'AUTH_REQUIRED',
+      redirectTo: 'https://project-aicgs.onrender.com/api/auth/discord?redirect=https://aicgs.netlify.app/?showVoting=true&t=' + Date.now()
+    });
+  }
 };
 
 // Get voting statistics
@@ -85,22 +129,11 @@ router.get('/remaining', isAuthenticated, async (req, res) => {
 });
 
 // Cast a vote
-router.post('/', async (req, res) => {
+router.post('/', isAuthenticated, async (req, res) => {
   try {
     const { agentId, selectedTraits } = req.body;
     console.log('Received vote request for agent:', agentId);
     console.log('Selected traits:', selectedTraits);
-
-    // Check if user is authenticated
-    if (!req.isAuthenticated()) {
-      console.log('Unauthenticated vote attempt');
-      return res.status(401).json({ 
-        message: 'Authentication required',
-        code: 'AUTH_REQUIRED',
-        redirectTo: 'https://project-aicgs.onrender.com/api/auth/discord?redirect=https://aicgs.netlify.app/?showVoting=true&t=' + Date.now()
-      });
-    }
-
     console.log('Authenticated user:', req.user.id);
 
     // Check user's total vote count
