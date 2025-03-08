@@ -66,3 +66,288 @@ button:focus-visible {
     background-color: #f9f9f9;
   }
 }
+
+/* Add this to your index.css file */
+
+/* Base mobile-first responsive styles */
+:root {
+  font-size: 16px;
+}
+
+/* Proper viewport settings for mobile */
+@media (max-width: 768px) {
+  body {
+    overscroll-behavior: none; /* Prevents bounce effect on some mobile browsers */
+  }
+  
+  /* Fix for mobile 100vh issue */
+  .vh-fix {
+    height: 100vh;
+    height: -webkit-fill-available;
+    height: fill-available;
+  }
+}
+
+/* Mobile-first layout adjustments */
+.mobile-container {
+  width: 100%;
+  padding: 12px;
+  box-sizing: border-box;
+}
+
+.mobile-scroll {
+  -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+  scrollbar-width: thin; /* Thinner scrollbars */
+}
+
+/* Responsive grid layout for mobile */
+.responsive-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+
+@media (min-width: 768px) {
+  .responsive-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 24px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .responsive-grid {
+    grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+    gap: 32px;
+  }
+}
+
+/* Mobile-friendly button styles */
+.mobile-button {
+  min-height: 44px; /* Apple's recommended minimum tap target size */
+  padding: 12px 16px;
+  margin: 4px;
+  border-radius: 8px;
+  font-size: 1rem;
+  touch-action: manipulation; /* Prevents delays on tap */
+}
+
+/* Mobile card component */
+.mobile-card {
+  padding: 16px;
+  border-radius: 12px;
+  margin-bottom: 16px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Mobile navigation styles */
+.mobile-nav {
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  gap: 12px;
+}
+
+@media (min-width: 768px) {
+  .mobile-nav {
+    flex-direction: row;
+    padding: 20px;
+  }
+}
+
+/* Touch-friendly form elements */
+.mobile-select {
+  padding: 12px;
+  font-size: 16px; /* Prevents zoom on iOS */
+  min-height: 44px;
+  border-radius: 8px;
+  width: 100%;
+  margin-bottom: 16px;
+  -webkit-appearance: none; /* Removes default styling */
+}
+
+/* Mobile-friendly checkbox/radio buttons */
+.mobile-checkbox {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 8px;
+}
+
+.mobile-checkbox input {
+  width: 24px;
+  height: 24px;
+  margin-right: 12px;
+}
+
+/* Mobile typography */
+.mobile-text-base {
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.mobile-text-sm {
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.mobile-text-lg {
+  font-size: 18px;
+  line-height: 1.6;
+}
+
+.mobile-text-xl {
+  font-size: 22px;
+  line-height: 1.3;
+}
+
+/* Modal sizes for mobile */
+.mobile-modal {
+  width: calc(100% - 32px);
+  max-width: 420px;
+  max-height: 80vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Fix for fixed position elements on mobile */
+.mobile-fixed-bottom {
+  position: fixed; 
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 16px;
+  background: linear-gradient(transparent, #111827 20%);
+  z-index: 100;
+}
+
+/* Media query for notched phones (iPhone X and newer) */
+@supports (padding: max(0px)) {
+  .mobile-fixed-bottom {
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
+    padding-left: max(16px, env(safe-area-inset-left));
+    padding-right: max(16px, env(safe-area-inset-right));
+  }
+}
+
+/* Hamburger menu for mobile */
+.mobile-menu-container {
+  display: block;
+}
+
+@media (min-width: 768px) {
+  .mobile-menu-container {
+    display: none;
+  }
+}
+
+.mobile-menu-button {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.mobile-menu {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.9);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  padding: 32px 16px;
+  transform: translateX(-100%);
+  transition: transform 0.3s ease-in-out;
+}
+
+.mobile-menu.active {
+  transform: translateX(0);
+}
+
+.mobile-menu-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: none;
+  border: none;
+  color: white;
+  font-size: 24px;
+  cursor: pointer;
+}
+
+/* Responsive layout for the AIInterface component */
+.ai-interface-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.ai-content-area {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+}
+
+@media (min-width: 1024px) {
+  .ai-content-area {
+    flex-direction: row;
+  }
+}
+
+.ai-main-column {
+  flex: 1;
+  overflow: auto;
+  padding: 16px;
+}
+
+.ai-sidebar {
+  width: 100%;
+  padding: 16px;
+  background: rgba(255,255,255,0.03);
+  overflow: auto;
+}
+
+@media (min-width: 1024px) {
+  .ai-sidebar {
+    width: 320px;
+    min-width: 320px;
+  }
+}
+
+/* Animation keyframes */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideInUp {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes pulse {
+  0% { opacity: 1; }
+  50% { opacity: 0.6; }
+  100% { opacity: 1; }
+}
+
+.fade-in {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+.slide-in-up {
+  animation: slideInUp 0.4s ease-out;
+}
+
+.pulse {
+  animation: pulse 2s infinite ease-in-out;
+}

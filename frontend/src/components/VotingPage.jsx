@@ -15,6 +15,18 @@ const VotingPage = ({ onBack = () => {}, onVote = () => {} }) => {
   const [traitStats, setTraitStats] = useState({});
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  
+  // Detect if device is mobile
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Check authentication status when component mounts
   useEffect(() => {
@@ -22,6 +34,7 @@ const VotingPage = ({ onBack = () => {}, onVote = () => {} }) => {
       try {
         setIsCheckingAuth(true);
         const status = await fetchAuthStatus();
+        console.log("Auth status:", status);
         setIsAuthenticated(status.isAuthenticated);
       } catch (error) {
         console.error('Error checking auth status:', error);
@@ -43,11 +56,13 @@ const VotingPage = ({ onBack = () => {}, onVote = () => {} }) => {
   const loadAgents = async () => {
     try {
       const agentsData = await fetchAgents();
+      console.log("Loaded agents:", agentsData.length);
       setAgents(agentsData.filter(agent => 
         agent.status === 'Conducting Community Sentiment Analysis' &&
         agent.votes < agent.votesNeeded
       ));
     } catch (error) {
+      console.error("Error loading agents:", error);
       setVoteErrors({ global: 'Failed to load agents. Please try again later.' });
     }
   };
@@ -55,6 +70,7 @@ const VotingPage = ({ onBack = () => {}, onVote = () => {} }) => {
   const loadRemainingVotes = async () => {
     try {
       const data = await getRemainingVotes();
+      console.log("Remaining votes:", data.remainingVotes);
       setRemainingVotes(data.remainingVotes);
     } catch (error) {
       console.error('Error loading remaining votes:', error);
@@ -89,6 +105,9 @@ const VotingPage = ({ onBack = () => {}, onVote = () => {} }) => {
     
     setIsVoting(true);
     try {
+      console.log("Submitting vote for:", selectedAgent.name);
+      console.log("Selected traits:", selectedTraits);
+      
       const response = await castVote(
         selectedAgent._id,
         selectedTraits
@@ -115,6 +134,7 @@ const VotingPage = ({ onBack = () => {}, onVote = () => {} }) => {
         });
       }
     } catch (error) {
+      console.error("Vote submission error:", error);
       setVoteErrors(prev => ({
         ...prev,
         [selectedAgent._id]: error.message || 'Failed to cast vote. Please try again.'
@@ -176,24 +196,27 @@ const VotingPage = ({ onBack = () => {}, onVote = () => {} }) => {
             left: '1.5rem',
             display: 'flex',
             alignItems: 'center',
+            justifyContent: 'center',
             gap: '0.5rem',
             color: '#9CA3AF',
             background: 'none',
             border: 'none',
-            cursor: 'pointer'
+            cursor: 'pointer',
+            padding: '8px'
           }}
         >
           <ArrowLeft size={20} />
-          Back
+          {!isMobile && "Back"}
         </button>
         
         <div style={{
-          maxWidth: '32rem',
+          maxWidth: isMobile ? '100%' : '32rem',
           width: '100%',
           background: '#1F2937',
           borderRadius: '0.75rem',
-          padding: '2rem',
-          textAlign: 'center'
+          padding: isMobile ? '1.5rem' : '2rem',
+          textAlign: 'center',
+          margin: isMobile ? '0 1rem' : '0'
         }}>
           <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1rem' }}>
             Authentication Required
@@ -204,7 +227,8 @@ const VotingPage = ({ onBack = () => {}, onVote = () => {} }) => {
           </p>
           <button
             onClick={() => {
-              window.location.href = `${authBaseUrl}/api/auth/discord?redirect=https://aicgs.netlify.app/?showVoting=true`;
+              // Add a timestamp to prevent caching issues
+              window.location.href = `${authBaseUrl}/api/auth/discord?redirect=https://aicgs.netlify.app/?showVoting=true&t=${Date.now()}`;
             }}
             style={{
               backgroundColor: 'rgba(88, 101, 242, 0.8)',
@@ -220,7 +244,8 @@ const VotingPage = ({ onBack = () => {}, onVote = () => {} }) => {
               margin: '0 auto',
               border: 'none',
               cursor: 'pointer',
-              transition: 'all 0.2s'
+              transition: 'all 0.2s',
+              minHeight: '44px' // Better touch target size
             }}
             onMouseEnter={e => {
               e.currentTarget.style.backgroundColor = 'rgba(88, 101, 242, 1)';
@@ -241,6 +266,94 @@ const VotingPage = ({ onBack = () => {}, onVote = () => {} }) => {
     );
   }
 
+  // Check if there are no agents
+  if (agents.length === 0 && !loading) {
+    return (
+      <div style={{
+        height: '100vh',
+        backgroundColor: '#111827',
+        color: 'white',
+        display: 'flex',
+        flexDirection: 'column'
+      }}>
+        {/* Header */}
+        <div style={{
+          padding: isMobile ? '1rem' : '1.5rem',
+          borderBottom: '1px solid rgba(255,255,255,0.1)',
+          background: 'rgba(0,0,0,0.2)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}>
+          <button
+            onClick={onBack}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              color: '#9CA3AF',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer'
+            }}
+          >
+            <ArrowLeft size={20} />
+            {!isMobile && "Back"}
+          </button>
+          <h1 style={{ fontSize: isMobile ? '1.2rem' : '1.5rem', fontWeight: 'bold' }}>Community Voting</h1>
+          <div style={{ 
+            background: 'rgba(99, 102, 241, 0.1)',
+            padding: '0.5rem 1rem',
+            borderRadius: '0.5rem',
+            fontSize: '0.875rem'
+          }}>
+            Votes: {remainingVotes}
+          </div>
+        </div>
+
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '2rem',
+          flex: 1,
+          textAlign: 'center'
+        }}>
+          <div style={{
+            fontSize: '6rem',
+            marginBottom: '1rem',
+            opacity: 0.5
+          }}>
+            🗳️
+          </div>
+          <h2 style={{ marginBottom: '1rem', fontSize: '1.5rem' }}>No Agents Available for Voting</h2>
+          <p style={{ color: 'rgba(255,255,255,0.7)', maxWidth: '500px', marginBottom: '2rem' }}>
+            There are currently no AI agents in the community review phase. 
+            Check back soon for new proposals!
+          </p>
+          <button
+            onClick={onBack}
+            style={{
+              background: 'rgba(99, 102, 241, 0.2)',
+              border: 'none',
+              padding: '0.75rem 1.5rem',
+              borderRadius: '0.5rem',
+              color: 'white',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}
+          >
+            <ArrowLeft size={16} />
+            Return to Dashboard
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{
       height: '100vh',
@@ -252,7 +365,7 @@ const VotingPage = ({ onBack = () => {}, onVote = () => {} }) => {
     }}>
       {/* Header */}
       <div style={{
-        padding: '1.5rem',
+        padding: isMobile ? '1rem' : '1.5rem',
         borderBottom: '1px solid rgba(255,255,255,0.1)',
         background: 'rgba(0,0,0,0.2)',
         display: 'flex',
@@ -272,16 +385,16 @@ const VotingPage = ({ onBack = () => {}, onVote = () => {} }) => {
           }}
         >
           <ArrowLeft size={20} />
-          Back
+          {!isMobile && "Back"}
         </button>
-        <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>Community Voting</h1>
+        <h1 style={{ fontSize: isMobile ? '1.2rem' : '1.5rem', fontWeight: 'bold' }}>Community Voting</h1>
         <div style={{ 
           background: 'rgba(99, 102, 241, 0.1)',
           padding: '0.5rem 1rem',
           borderRadius: '0.5rem',
           fontSize: '0.875rem'
         }}>
-          Remaining Votes: {remainingVotes}
+          Votes: {remainingVotes}
         </div>
       </div>
 
@@ -289,9 +402,9 @@ const VotingPage = ({ onBack = () => {}, onVote = () => {} }) => {
       <div style={{
         flex: 1,
         overflowY: 'auto',
-        padding: '1.5rem',
-        height: 'calc(100vh - 80px)',
-        paddingBottom: '100px'
+        padding: isMobile ? '1rem' : '1.5rem',
+        paddingBottom: '100px',
+        WebkitOverflowScrolling: 'touch'
       }}>
         {showSuccess && (
           <div style={{
@@ -302,7 +415,8 @@ const VotingPage = ({ onBack = () => {}, onVote = () => {} }) => {
             marginBottom: '1.5rem',
             display: 'flex',
             alignItems: 'center',
-            gap: '0.5rem'
+            gap: '0.5rem',
+            animation: 'fadeIn 0.3s ease'
           }}>
             <Check size={16} />
             Vote successfully cast! Thank you for participating in AI governance.
@@ -329,8 +443,8 @@ const VotingPage = ({ onBack = () => {}, onVote = () => {} }) => {
         <div style={{
           backgroundColor: '#1F2937',
           borderRadius: '0.75rem',
-          padding: '1.5rem',
-          marginBottom: '2rem'
+          padding: isMobile ? '1rem' : '1.5rem',
+          marginBottom: '1.5rem'
         }}>
           <h2 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '1rem' }}>
             How Voting Works
@@ -343,7 +457,7 @@ const VotingPage = ({ onBack = () => {}, onVote = () => {} }) => {
           }}>
             <AlertCircle size={20} style={{ marginTop: '0.25rem', flexShrink: 0 }} />
             <div>
-              <p>
+              <p style={{ fontSize: isMobile ? '14px' : '16px' }}>
                 Select an AI agent and vote on their proposed traits. You can select specific traits 
                 to support. Your votes help shape the development direction of our AI community. Each agent 
                 requires 750 votes to proceed to migration.
@@ -352,11 +466,11 @@ const VotingPage = ({ onBack = () => {}, onVote = () => {} }) => {
           </div>
         </div>
 
-        {/* Agent Grid - Two Column Layout */}
+        {/* Agent Grid - Responsive Layout */}
         <div style={{ 
           display: 'grid', 
-          gridTemplateColumns: 'repeat(auto-fill, minmax(400px, 1fr))', 
-          gap: '1.5rem',
+          gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(400px, 1fr))', 
+          gap: isMobile ? '1rem' : '1.5rem',
           marginBottom: '5rem'
         }}>
           {agents.map((agent) => (
@@ -384,10 +498,13 @@ const VotingPage = ({ onBack = () => {}, onVote = () => {} }) => {
                 style={{
                   backgroundColor: selectedAgent?._id === agent._id ? '#1F2937' : '#1F2937',
                   borderRadius: '0.75rem',
-                  padding: '2rem',
+                  padding: isMobile ? '1.5rem' : '2rem',
                   cursor: 'pointer',
                   border: selectedAgent?._id === agent._id ? '2px solid #6366F1' : '2px solid transparent',
-                  transition: 'all 0.2s'
+                  transition: 'all 0.2s',
+                  animation: 'fadeIn 0.3s ease',
+                  animationDelay: '0.1s',
+                  animationFillMode: 'both'
                 }}
               >
                 <div style={{
@@ -399,7 +516,11 @@ const VotingPage = ({ onBack = () => {}, onVote = () => {} }) => {
                     <h3 style={{ fontSize: '1.5rem', fontWeight: 600, marginBottom: '0.5rem' }}>
                       {agent.name}
                     </h3>
-                    <p style={{ color: '#9CA3AF', fontSize: '1rem', lineHeight: '1.5' }}>
+                    <p style={{ 
+                      color: '#9CA3AF', 
+                      fontSize: isMobile ? '0.9rem' : '1rem', 
+                      lineHeight: '1.5' 
+                    }}>
                       {agent.description}
                     </p>
                   </div>
@@ -442,7 +563,11 @@ const VotingPage = ({ onBack = () => {}, onVote = () => {} }) => {
                         }}>
                           Select traits to support:
                         </h4>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem' }}>
+                        <div style={{ 
+                          display: 'flex', 
+                          flexWrap: 'wrap', 
+                          gap: '0.75rem'
+                        }}>
                           {agent.proposedTraits.map((trait, index) => (
                             <button
                               key={index}
@@ -462,7 +587,11 @@ const VotingPage = ({ onBack = () => {}, onVote = () => {} }) => {
                                 fontSize: '0.875rem',
                                 border: 'none',
                                 cursor: 'pointer',
-                                transition: 'all 0.2s'
+                                transition: 'all 0.2s',
+                                minHeight: '44px', // Better touch target
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
                               }}
                             >
                               {trait}
@@ -471,7 +600,43 @@ const VotingPage = ({ onBack = () => {}, onVote = () => {} }) => {
                         </div>
                       </div>
 
-                      <TraitVotingStats agent={agent} traitStats={traitStats} />
+                      <TraitVotingStats 
+                        agent={agent} 
+                        traitStats={traitStats || {}} 
+                      />
+                      
+                      {/* Mobile-only vote button inside the selected card */}
+                      {isMobile && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (selectedTraits.length > 0) {
+                              setShowConfirmation(true);
+                            }
+                          }}
+                          disabled={selectedTraits.length === 0}
+                          style={{
+                            backgroundColor: selectedTraits.length > 0 ? '#6366F1' : '#374151',
+                            color: selectedTraits.length > 0 ? 'white' : '#9CA3AF',
+                            padding: '1rem',
+                            borderRadius: '0.5rem',
+                            fontSize: '1rem',
+                            fontWeight: 600,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '0.5rem',
+                            border: 'none',
+                            cursor: selectedTraits.length > 0 ? 'pointer' : 'not-allowed',
+                            width: '100%',
+                            marginTop: '1rem',
+                            minHeight: '44px' // Better touch target
+                          }}
+                        >
+                          <Vote size={20} />
+                          Cast Vote
+                        </button>
+                      )}
                     </>
                   )}
                 </div>
@@ -481,41 +646,46 @@ const VotingPage = ({ onBack = () => {}, onVote = () => {} }) => {
         </div>
       </div>
 
-      {/* Vote Button */}
-      <div style={{
-        position: 'fixed',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        padding: '1rem',
-        background: 'linear-gradient(transparent, #111827 20%)',
-        display: 'flex',
-        justifyContent: 'center'
-      }}>
-        <button
-          onClick={() => selectedAgent && selectedTraits.length > 0 && setShowConfirmation(true)}
-          disabled={!selectedAgent || selectedTraits.length === 0}
-          style={{
-            backgroundColor: selectedAgent && selectedTraits.length > 0 ? '#6366F1' : '#374151',
-            color: selectedAgent && selectedTraits.length > 0 ? 'white' : '#9CA3AF',
-            padding: '1rem 2rem',
-            borderRadius: '0.5rem',
-            fontSize: '1.125rem',
-            fontWeight: 600,
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            border: 'none',
-            cursor: selectedAgent && selectedTraits.length > 0 ? 'pointer' : 'not-allowed',
-            maxWidth: '64rem',
-            width: '100%',
-            justifyContent: 'center'
-          }}
-        >
-          <Vote size={20} />
-          Cast Vote
-        </button>
-      </div>
+      {/* Vote Button - Fixed at bottom for non-mobile only */}
+      {!isMobile && (
+        <div style={{
+          position: 'fixed',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          padding: '1rem',
+          background: 'linear-gradient(transparent, #111827 20%)',
+          display: 'flex',
+          justifyContent: 'center',
+          // Add iOS safe area padding
+          paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 1rem))'
+        }}>
+          <button
+            onClick={() => selectedAgent && selectedTraits.length > 0 && setShowConfirmation(true)}
+            disabled={!selectedAgent || selectedTraits.length === 0}
+            style={{
+              backgroundColor: selectedAgent && selectedTraits.length > 0 ? '#6366F1' : '#374151',
+              color: selectedAgent && selectedTraits.length > 0 ? 'white' : '#9CA3AF',
+              padding: '1rem 2rem',
+              borderRadius: '0.5rem',
+              fontSize: '1.125rem',
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              border: 'none',
+              cursor: selectedAgent && selectedTraits.length > 0 ? 'pointer' : 'not-allowed',
+              maxWidth: '64rem',
+              width: '100%',
+              justifyContent: 'center',
+              minHeight: '44px' // Better touch target
+            }}
+          >
+            <Vote size={20} />
+            Cast Vote
+          </button>
+        </div>
+      )}
 
       {/* Confirmation Modal */}
       {showConfirmation && (
@@ -532,9 +702,10 @@ const VotingPage = ({ onBack = () => {}, onVote = () => {} }) => {
           <div style={{
             backgroundColor: '#1F2937',
             borderRadius: '0.75rem',
-            padding: '2rem',
-            maxWidth: '28rem',
-            width: '100%'
+            padding: isMobile ? '1.5rem' : '2rem',
+            maxWidth: isMobile ? '90%' : '28rem',
+            width: '100%',
+            animation: 'fadeIn 0.2s ease'
           }}>
             <div style={{
               display: 'flex',
@@ -549,7 +720,8 @@ const VotingPage = ({ onBack = () => {}, onVote = () => {} }) => {
                   color: '#9CA3AF',
                   background: 'none',
                   border: 'none',
-                  cursor: 'pointer'
+                  cursor: 'pointer',
+                  padding: '4px'
                 }}
               >
                 <X size={20} />
@@ -596,12 +768,20 @@ const VotingPage = ({ onBack = () => {}, onVote = () => {} }) => {
                 justifyContent: 'center',
                 gap: '0.5rem',
                 border: 'none',
-                cursor: isVoting ? 'not-allowed' : 'pointer'
+                cursor: isVoting ? 'not-allowed' : 'pointer',
+                minHeight: '44px' // Better touch target
               }}
             >
               {isVoting ? (
                 <>
-                  <Loader className="animate-spin" size={20} />
+                  <div className="animate-spin" style={{
+                    width: '20px',
+                    height: '20px',
+                    border: '2px solid rgba(255,255,255,0.3)',
+                    borderRadius: '50%',
+                    borderTopColor: 'white',
+                    marginRight: '8px'
+                  }}></div>
                   Confirming Vote...
                 </>
               ) : (
@@ -620,8 +800,25 @@ const VotingPage = ({ onBack = () => {}, onVote = () => {} }) => {
           from { transform: rotate(0deg); }
           to { transform: rotate(360deg); }
         }
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes slideInUp {
+          from { transform: translateY(20px); opacity: 0; }
+          to { transform: translateY(0); opacity: 1; }
+        }
         .animate-spin {
           animation: spin 1s linear infinite;
+        }
+        * {
+          box-sizing: border-box;
+          -webkit-tap-highlight-color: transparent;
+        }
+        body {
+          margin: 0;
+          padding: 0;
+          overscroll-behavior: none;
         }
       `}</style>
     </div>

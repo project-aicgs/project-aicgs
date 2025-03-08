@@ -38,7 +38,7 @@ app.use(cors({
 // Body parser middleware
 app.use(express.json());
 
-// Session Configuration
+// Session Configuration - Fixed for mobile
 app.use(session({
   secret: process.env.SESSION_SECRET,
   resave: false,
@@ -49,9 +49,9 @@ app.use(session({
   }),
   cookie: {
     secure: process.env.NODE_ENV === 'production', // Secure in production
-    sameSite: 'none', // Important for cross-site requests
-    maxAge: 24 * 60 * 60 * 1000, // 1 day
-    domain: undefined, // Let the browser set the domain based on the request
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // Critical for cross-site cookies
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days - extended for better persistence
+    domain: process.env.NODE_ENV === 'production' ? undefined : 'localhost', // Let the browser handle the domain
     path: '/', // Ensure cookie is available for all paths
     httpOnly: true // Safer to prevent JavaScript access
   },

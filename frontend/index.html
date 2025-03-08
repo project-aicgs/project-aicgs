@@ -1,13 +1,131 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Vite + React</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <!-- Enhanced Mobile Viewport Settings -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <!-- Theme color for browser UI -->
+    <meta name="theme-color" content="#0F1117" />
+    <!-- iOS Settings -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="AICGS" />
+    <!-- PWA capabilities -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    <!-- SEO and social sharing -->
+    <meta name="description" content="AI Community Governance System - Vote on and shape the development of AI agents through decentralized governance." />
+    <meta property="og:title" content="AICGS - AI Community Governance System" />
+    <meta property="og:description" content="Participate in the evolution of AI through decentralized community voting." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <title>AICGS - AI Community Governance System</title>
+    <!-- Preconnect to necessary domains -->
+    <link rel="preconnect" href="https://project-aicgs.onrender.com" />
+    <link rel="preconnect" href="https://cdn.discordapp.com" />
+    <style>
+      /* Critical path CSS for early rendering */
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      
+      html, body {
+        height: 100%;
+        width: 100%;
+        background-color: #0F1117;
+        color: #ffffff;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+        -webkit-tap-highlight-color: transparent;
+        -webkit-font-smoothing: antialiased;
+        overscroll-behavior: none;
+      }
+      
+      #root {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+      }
+      
+      /* Loading spinner */
+      .initial-loader {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        background-color: #0F1117;
+        z-index: 9999;
+        gap: 16px;
+      }
+      
+      .spinner {
+        width: 40px;
+        height: 40px;
+        border: 3px solid rgba(99, 102, 241, 0.3);
+        border-radius: 50%;
+        border-top-color: rgba(99, 102, 241, 1);
+        animation: spin 1s linear infinite;
+      }
+      
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+      
+      @keyframes fadeOut {
+        to { opacity: 0; visibility: hidden; }
+      }
+      
+      /* Fix 100vh issue on mobile */
+      @supports (-webkit-touch-callout: none) {
+        .vh-fix {
+          height: -webkit-fill-available;
+        }
+      }
+    </style>
   </head>
   <body>
+    <!-- Initial loading state -->
+    <div class="initial-loader" id="app-loader">
+      <div class="spinner"></div>
+      <div>Loading AICGS...</div>
+    </div>
+    
     <div id="root"></div>
+    
     <script type="module" src="/src/main.jsx"></script>
+    <script>
+      // Handle loading state
+      window.addEventListener('load', function() {
+        setTimeout(function() {
+          const loader = document.getElementById('app-loader');
+          if (loader) {
+            loader.style.animation = 'fadeOut 0.5s forwards';
+          }
+        }, 500);
+      });
+      
+      // Register service worker for PWA if in production
+      if ('serviceWorker' in navigator && window.location.hostname !== 'localhost') {
+        navigator.serviceWorker.register('/sw.js')
+          .catch(error => {
+            console.error('Service worker registration failed:', error);
+          });
+      }
+      
+      // iOS height fix
+      function setVH() {
+        let vh = window.innerHeight * 0.01;
+        document.documentElement.style.setProperty('--vh', `${vh}px`);
+      }
+      
+      setVH();
+      window.addEventListener('resize', setVH);
+    </script>
   </body>
 </html>

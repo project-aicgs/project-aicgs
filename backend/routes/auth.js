@@ -27,9 +27,11 @@ passport.use(new DiscordStrategy({
   },
   async (accessToken, refreshToken, profile, done) => {
     try {
+      console.log('Discord auth callback received for user:', profile.username);
       let user = await User.findOne({ discordId: profile.id });
       
       if (!user) {
+        console.log('Creating new user for Discord ID:', profile.id);
         user = await User.create({
           discordId: profile.id,
           username: profile.username,
@@ -37,6 +39,7 @@ passport.use(new DiscordStrategy({
           avatar: profile.avatar
         });
       } else {
+        console.log('Updating existing user:', user.username);
         // Update user information in case it changed on Discord
         user.username = profile.username;
         user.email = profile.email;
@@ -46,16 +49,28 @@ passport.use(new DiscordStrategy({
       
       return done(null, user);
     } catch (err) {
+      console.error('Error in Discord strategy:', err);
       return done(err, null);
     }
   }
 ));
 
-// When redirecting from Discord auth, save the return URL in session
+// Save the return URL when initiating Discord auth
 router.get('/discord', (req, res, next) => {
-  // Store the referer or a provided redirect URL
-  req.session.returnTo = req.query.redirect || req.headers.referer || 'https://aicgs.netlify.app';
-  next();
+  // Get the redirectUrl from query or fallback to referer
+  const redirectUrl = req.query.redirect || req.headers.referer || 'https://aicgs.netlify.app';
+  
+  // Store it in session for later use
+  req.session.returnTo = redirectUrl;
+  console.log("Setting return URL to:", redirectUrl);
+  
+  // Force session save before redirecting to ensure it's available after auth
+  req.session.save((err) => {
+    if (err) {
+      console.error("Error saving session:", err);
+    }
+    next();
+  });
 }, passport.authenticate('discord'));
 
 // After successful authentication, redirect to the saved URL
@@ -66,14 +81,28 @@ router.get('/discord/callback',
   (req, res) => {
     // Get the return URL from session and redirect there
     const returnTo = req.session.returnTo || 'https://aicgs.netlify.app/?showVoting=true';
+    console.log("Successfully authenticated, redirecting to:", returnTo);
+    
+    // Clear the returnTo from session
     delete req.session.returnTo;
-    res.redirect(returnTo);
+    
+    // Make sure to save session changes before redirecting
+    req.session.save((err) => {
+      if (err) {
+        console.error("Error saving session after auth:", err);
+      }
+      res.redirect(returnTo);
+    });
   }
 );
 
-// Auth status endpoint to check if user is authenticated
+// Auth status endpoint with enhanced logging
 router.get('/status', (req, res) => {
-  console.log('Auth status check:', req.isAuthenticated(), req.user?.id); // More specific logging
+  console.log('Auth status check:');
+  console.log('- isAuthenticated:', req.isAuthenticated());
+  console.log('- User ID:', req.user ? req.user.id : 'none');
+  console.log('- Session ID:', req.session.id || 'no session');
+  
   if (req.isAuthenticated()) {
     res.json({
       isAuthenticated: true,
@@ -87,17 +116,26 @@ router.get('/status', (req, res) => {
   }
 });
 
-// Logout route
+// Logout route with improved handling
 router.get('/logout', (req, res) => {
+  console.log("Logging out user:", req.user ? req.user.username : "Unknown");
+  
   req.logout((err) => {
     if (err) {
+      console.error("Error during logout:", err);
       return res.status(500).json({ message: 'Error logging out' });
     }
-    // Clear the session
+    
+    // Clear the session completely
     req.session.destroy((err) => {
       if (err) {
+        console.error("Error destroying session:", err);
         return res.status(500).json({ message: 'Error destroying session' });
       }
+      
+      // Clear the cookie
+      res.clearCookie('connect.sid');
+      
       // Redirect to frontend after successful logout
       res.redirect(process.env.NODE_ENV === 'production'
         ? 'https://aicgs.netlify.app'
