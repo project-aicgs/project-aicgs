@@ -15,8 +15,9 @@ const VotingPage = ({ onBack = () => {}, onVote = () => {} }) => {
   const [traitStats, setTraitStats] = useState({});
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  const [isLoadingAgents, setIsLoadingAgents] = useState(true); // Fixed: Added missing loading state
   
-  // Detect if device is mobile
+  // Check if device is mobile
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   
   useEffect(() => {
@@ -55,15 +56,19 @@ const VotingPage = ({ onBack = () => {}, onVote = () => {} }) => {
 
   const loadAgents = async () => {
     try {
+      setIsLoadingAgents(true); // Start loading state
       const agentsData = await fetchAgents();
       console.log("Loaded agents:", agentsData.length);
       setAgents(agentsData.filter(agent => 
         agent.status === 'Conducting Community Sentiment Analysis' &&
         agent.votes < agent.votesNeeded
       ));
+      setVoteErrors({}); // Clear any previous errors
     } catch (error) {
       console.error("Error loading agents:", error);
       setVoteErrors({ global: 'Failed to load agents. Please try again later.' });
+    } finally {
+      setIsLoadingAgents(false); // End loading state regardless of success/failure
     }
   };
 
@@ -228,7 +233,8 @@ const VotingPage = ({ onBack = () => {}, onVote = () => {} }) => {
           <button
             onClick={() => {
               // Add a timestamp to prevent caching issues
-              window.location.href = `${authBaseUrl}/api/auth/discord?redirect=https://aicgs.netlify.app/?showVoting=true&t=${Date.now()}`;
+              const redirectUrl = encodeURIComponent(window.location.href.split('?')[0] + '?showVoting=true');
+              window.location.href = `${authBaseUrl}/api/auth/discord?redirect=${redirectUrl}&t=${Date.now()}`;
             }}
             style={{
               backgroundColor: 'rgba(88, 101, 242, 0.8)',
@@ -266,8 +272,76 @@ const VotingPage = ({ onBack = () => {}, onVote = () => {} }) => {
     );
   }
 
+  // Loading state while fetching agents
+  if (isLoadingAgents) {
+    return (
+      <div style={{
+        height: '100vh',
+        backgroundColor: '#111827',
+        color: 'white',
+        display: 'flex',
+        flexDirection: 'column'
+      }}>
+        {/* Header */}
+        <div style={{
+          padding: isMobile ? '1rem' : '1.5rem',
+          borderBottom: '1px solid rgba(255,255,255,0.1)',
+          background: 'rgba(0,0,0,0.2)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}>
+          <button
+            onClick={onBack}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              color: '#9CA3AF',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer'
+            }}
+          >
+            <ArrowLeft size={20} />
+            {!isMobile && "Back"}
+          </button>
+          <h1 style={{ fontSize: isMobile ? '1.2rem' : '1.5rem', fontWeight: 'bold' }}>Community Voting</h1>
+          <div style={{ 
+            background: 'rgba(99, 102, 241, 0.1)',
+            padding: '0.5rem 1rem',
+            borderRadius: '0.5rem',
+            fontSize: '0.875rem'
+          }}>
+            Votes: {remainingVotes}
+          </div>
+        </div>
+
+        {/* Loading indicator */}
+        <div style={{
+          flex: 1,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexDirection: 'column',
+          gap: '1rem'
+        }}>
+          <div style={{ 
+            animation: 'spin 1s linear infinite',
+            width: '3rem',
+            height: '3rem',
+            border: '3px solid rgba(99, 102, 241, 0.3)',
+            borderRadius: '50%',
+            borderTop: '3px solid rgba(99, 102, 241, 1)',
+          }} />
+          <div>Loading agents...</div>
+        </div>
+      </div>
+    );
+  }
+
   // Check if there are no agents
-  if (agents.length === 0 && !loading) {
+  if (agents.length === 0 && !isLoadingAgents) {
     return (
       <div style={{
         height: '100vh',

@@ -23,9 +23,10 @@ passport.use(new DiscordStrategy({
     clientID: process.env.DISCORD_CLIENT_ID,
     clientSecret: process.env.DISCORD_CLIENT_SECRET,
     callbackURL: process.env.DISCORD_CALLBACK_URL,
-    scope: ['identify', 'email']
+    scope: ['identify', 'email'],
+    passReqToCallback: true
   },
-  async (accessToken, refreshToken, profile, done) => {
+  async (req, accessToken, refreshToken, profile, done) => {
     try {
       console.log('Discord auth callback received for user:', profile.username);
       let user = await User.findOne({ discordId: profile.id });
@@ -55,33 +56,40 @@ passport.use(new DiscordStrategy({
   }
 ));
 
-// Save the return URL when initiating Discord auth
+// Save the return URL when initiating Discord auth - with additional logging
 router.get('/discord', (req, res, next) => {
-  // Get the redirectUrl from query or fallback to referer
-  const redirectUrl = req.query.redirect || req.headers.referer || 'https://aicgs.netlify.app';
+  // Get the redirectUrl from query parameters
+  const redirectUrl = req.query.redirect || 'https://aicgs.netlify.app';
   
-  // Store it in session for later use
+  // Store the redirect URL in the session
   req.session.returnTo = redirectUrl;
-  console.log("Setting return URL to:", redirectUrl);
+  console.log("Setting returnTo URL in session:", redirectUrl);
+  console.log("Session ID:", req.session.id);
   
   // Force session save before redirecting to ensure it's available after auth
   req.session.save((err) => {
     if (err) {
-      console.error("Error saving session:", err);
+      console.error("Error saving session before auth:", err);
+      return res.status(500).send("Error preparing authentication. Please try again.");
     }
-    next();
+    
+    console.log("Session saved successfully, proceeding to Discord auth");
+    passport.authenticate('discord')(req, res, next);
   });
-}, passport.authenticate('discord'));
+});
 
-// After successful authentication, redirect to the saved URL
+// After successful authentication, redirect to the saved URL - with enhanced error handling
 router.get('/discord/callback', 
   passport.authenticate('discord', {
-    failureRedirect: 'https://aicgs.netlify.app'
+    failureRedirect: 'https://aicgs.netlify.app?authError=true'
   }),
   (req, res) => {
-    // Get the return URL from session and redirect there
-    const returnTo = req.session.returnTo || 'https://aicgs.netlify.app/?showVoting=true';
-    console.log("Successfully authenticated, redirecting to:", returnTo);
+    console.log("Discord auth callback successful for user:", req.user ? req.user.username : "unknown");
+    console.log("Session ID:", req.session.id);
+    
+    // Get the return URL from session
+    const returnTo = req.session.returnTo || 'https://aicgs.netlify.app';
+    console.log("Redirecting to:", returnTo);
     
     // Clear the returnTo from session
     delete req.session.returnTo;
@@ -90,57 +98,68 @@ router.get('/discord/callback',
     req.session.save((err) => {
       if (err) {
         console.error("Error saving session after auth:", err);
+        return res.redirect('https://aicgs.netlify.app?authError=sessionSave');
       }
-      res.redirect(returnTo);
+      
+      // Add cache-busting parameter to prevent browser caching
+      const redirectUrl = new URL(returnTo);
+      redirectUrl.searchParams.set('t', Date.now().toString());
+      
+      res.redirect(redirectUrl.toString());
     });
   }
 );
 
-// Auth status endpoint with enhanced logging
+// Auth status endpoint with enhanced logging and error handling
 router.get('/status', (req, res) => {
   console.log('Auth status check:');
   console.log('- isAuthenticated:', req.isAuthenticated());
   console.log('- User ID:', req.user ? req.user.id : 'none');
   console.log('- Session ID:', req.session.id || 'no session');
   
+  // Return detailed status for debugging
   if (req.isAuthenticated()) {
     res.json({
       isAuthenticated: true,
-      user: req.user
+      user: req.user,
+      sessionActive: true
     });
   } else {
+    // Check if session exists but no user
+    const hasSession = !!req.session && !!req.session.id;
+    
     res.json({
       isAuthenticated: false,
-      user: null
+      user: null,
+      sessionActive: hasSession
     });
   }
 });
 
-// Logout route with improved handling
+// Logout route with enhanced error handling
 router.get('/logout', (req, res) => {
   console.log("Logging out user:", req.user ? req.user.username : "Unknown");
   
-  req.logout((err) => {
+  // First destroy the session
+  req.session.destroy((err) => {
     if (err) {
-      console.error("Error during logout:", err);
-      return res.status(500).json({ message: 'Error logging out' });
+      console.error("Error destroying session:", err);
     }
     
-    // Clear the session completely
-    req.session.destroy((err) => {
-      if (err) {
-        console.error("Error destroying session:", err);
-        return res.status(500).json({ message: 'Error destroying session' });
-      }
-      
-      // Clear the cookie
-      res.clearCookie('connect.sid');
-      
-      // Redirect to frontend after successful logout
-      res.redirect(process.env.NODE_ENV === 'production'
-        ? 'https://aicgs.netlify.app'
-        : 'http://localhost:5173');
+    // Clear the cookie - even if there was an error with the session
+    res.clearCookie('connect.sid', {
+      path: '/',
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
     });
+    
+    // Then redirect to the frontend
+    const redirectUrl = process.env.NODE_ENV === 'production'
+      ? 'https://aicgs.netlify.app?loggedOut=true'
+      : 'http://localhost:5173?loggedOut=true';
+    
+    res.redirect(redirectUrl);
   });
 });
 

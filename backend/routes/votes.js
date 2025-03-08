@@ -20,7 +20,7 @@ router.get('/trait-stats/:agentId', async (req, res) => {
   try {
     console.log('Fetching trait stats for agent:', req.params.agentId);
     const votes = await Vote.find({ agentId: req.params.agentId });
-    console.log('Found votes:', votes);
+    console.log('Found votes for trait stats:', votes.length);
     const traitStats = {};
     
     votes.forEach(vote => {
@@ -44,12 +44,16 @@ const isAuthenticated = (req, res, next) => {
   if (req.isAuthenticated()) {
     return next();
   }
+  
+  // Enhanced error response with more details
   res.status(401).json({ 
     message: 'Authentication required',
-    redirectTo: 'https://project-aicgs.onrender.com/api/auth/discord?redirect=https://aicgs.netlify.app/?showVoting=true'
+    code: 'AUTH_REQUIRED',
+    redirectTo: 'https://project-aicgs.onrender.com/api/auth/discord?redirect=https://aicgs.netlify.app/?showVoting=true&t=' + Date.now()
   });
 };
 
+// Get voting statistics
 router.get('/stats', async (req, res) => {
   try {
     console.log('Fetching vote stats');
@@ -66,10 +70,13 @@ router.get('/stats', async (req, res) => {
   }
 });
 
+// Get remaining votes for authenticated user
 router.get('/remaining', isAuthenticated, async (req, res) => {
   try {
+    console.log('Fetching remaining votes for user:', req.user.id);
     const userVoteCount = await getUserVoteCount(req.user.id);
     const remainingVotes = 100 - userVoteCount;
+    console.log('Remaining votes:', remainingVotes);
     res.json({ remainingVotes });
   } catch (err) {
     console.error('Error in /remaining:', err);
@@ -77,20 +84,29 @@ router.get('/remaining', isAuthenticated, async (req, res) => {
   }
 });
 
+// Cast a vote
 router.post('/', async (req, res) => {
   try {
     const { agentId, selectedTraits } = req.body;
+    console.log('Received vote request for agent:', agentId);
+    console.log('Selected traits:', selectedTraits);
 
     // Check if user is authenticated
     if (!req.isAuthenticated()) {
+      console.log('Unauthenticated vote attempt');
       return res.status(401).json({ 
         message: 'Authentication required',
-        redirectTo: 'https://project-aicgs.onrender.com/api/auth/discord?redirect=https://aicgs.netlify.app/?showVoting=true'
+        code: 'AUTH_REQUIRED',
+        redirectTo: 'https://project-aicgs.onrender.com/api/auth/discord?redirect=https://aicgs.netlify.app/?showVoting=true&t=' + Date.now()
       });
     }
 
+    console.log('Authenticated user:', req.user.id);
+
     // Check user's total vote count
     const userVoteCount = await getUserVoteCount(req.user.id);
+    console.log('Current vote count for user:', userVoteCount);
+    
     if (userVoteCount >= 100) {
       return res.status(400).json({ message: 'You have reached the maximum limit of 100 votes' });
     }
@@ -102,12 +118,14 @@ router.post('/', async (req, res) => {
     });
 
     if (existingVote) {
+      console.log('User already voted for this agent');
       return res.status(400).json({ message: 'You have already voted for this agent' });
     }
 
     // Get the agent and check its status
     const agent = await Agent.findById(agentId);
     if (!agent) {
+      console.log('Agent not found:', agentId);
       return res.status(404).json({ message: 'Agent not found' });
     }
 
@@ -115,6 +133,7 @@ router.post('/', async (req, res) => {
     if (agent.votes >= agent.votesNeeded || 
         agent.status === 'Agent Migration Processing' || 
         agent.status === 'Active') {
+      console.log('Agent not accepting votes:', agent.status);
       return res.status(400).json({ message: 'This agent is no longer accepting votes' });
     }
 
@@ -137,6 +156,7 @@ router.post('/', async (req, res) => {
     });
 
     await vote.save();
+    console.log('Vote saved successfully');
 
     // Create activity entry
     const activity = new Activity({
@@ -146,6 +166,7 @@ router.post('/', async (req, res) => {
     });
 
     await activity.save();
+    console.log('Activity record created');
 
     // Update agent's vote count and check if it reached the threshold
     let updateData = { $inc: { votes: 1 } };
@@ -158,6 +179,8 @@ router.post('/', async (req, res) => {
       updateData,
       { new: true }
     );
+
+    console.log('Agent updated:', updatedAgent);
 
     // Get updated trait stats
     const votes = await Vote.find({ agentId });
