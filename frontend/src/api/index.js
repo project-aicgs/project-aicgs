@@ -1,4 +1,5 @@
 // api/index.js
+// Dynamic API URL based on environment
 const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
   ? 'http://localhost:5000/api'
   : 'https://project-aicgs.onrender.com/api';
@@ -14,6 +15,7 @@ export const fetchAuthStatus = async () => {
     return { isAuthenticated: false, user: null };
   }
 };
+
 export const fetchAgents = async () => {
   try {
     const response = await fetch(`${API_URL}/agents`, {
@@ -65,6 +67,9 @@ export const getRemainingVotes = async () => {
       credentials: 'include'
     });
     if (!response.ok) {
+      if (response.status === 401) {
+        return { remainingVotes: 0 };
+      }
       throw new Error('Failed to fetch remaining votes');
     }
     return await response.json();
@@ -104,7 +109,9 @@ export const castVote = async (agentId, selectedTraits) => {
     });
 
     if (response.status === 401) {
-      window.location.href = `${API_URL}/auth/discord`;
+      const data = await response.json();
+      // Redirect to authentication first, then return to voting
+      window.location.href = data.redirectTo || `${API_URL.replace('/api', '')}/api/auth/discord?redirect=https://aicgs.netlify.app/?showVoting=true`;
       return null;
     }
 

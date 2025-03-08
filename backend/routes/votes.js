@@ -44,7 +44,10 @@ const isAuthenticated = (req, res, next) => {
   if (req.isAuthenticated()) {
     return next();
   }
-  res.status(401).json({ message: 'Authentication required' });
+  res.status(401).json({ 
+    message: 'Authentication required',
+    redirectTo: 'https://project-aicgs.onrender.com/api/auth/discord?redirect=https://aicgs.netlify.app/?showVoting=true'
+  });
 };
 
 router.get('/stats', async (req, res) => {
@@ -74,9 +77,17 @@ router.get('/remaining', isAuthenticated, async (req, res) => {
   }
 });
 
-router.post('/', isAuthenticated, async (req, res) => {
+router.post('/', async (req, res) => {
   try {
     const { agentId, selectedTraits } = req.body;
+
+    // Check if user is authenticated
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ 
+        message: 'Authentication required',
+        redirectTo: 'https://project-aicgs.onrender.com/api/auth/discord?redirect=https://aicgs.netlify.app/?showVoting=true'
+      });
+    }
 
     // Check user's total vote count
     const userVoteCount = await getUserVoteCount(req.user.id);

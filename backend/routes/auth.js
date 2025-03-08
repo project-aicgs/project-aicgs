@@ -51,21 +51,29 @@ passport.use(new DiscordStrategy({
   }
 ));
 
-// Auth routes
-router.get('/discord', passport.authenticate('discord'));
+// When redirecting from Discord auth, save the return URL in session
+router.get('/discord', (req, res, next) => {
+  // Store the referer or a provided redirect URL
+  req.session.returnTo = req.query.redirect || req.headers.referer || 'https://aicgs.netlify.app';
+  next();
+}, passport.authenticate('discord'));
 
+// After successful authentication, redirect to the saved URL
 router.get('/discord/callback', 
   passport.authenticate('discord', {
     failureRedirect: 'https://aicgs.netlify.app'
   }),
   (req, res) => {
-    // Successful authentication, redirect to frontend
-    res.redirect('https://aicgs.netlify.app/?showVoting=true');
+    // Get the return URL from session and redirect there
+    const returnTo = req.session.returnTo || 'https://aicgs.netlify.app/?showVoting=true';
+    delete req.session.returnTo;
+    res.redirect(returnTo);
   }
 );
 
+// Auth status endpoint to check if user is authenticated
 router.get('/status', (req, res) => {
-  console.log('Auth status check:', req.isAuthenticated(), req.user); // Debug log
+  console.log('Auth status check:', req.isAuthenticated(), req.user?.id); // More specific logging
   if (req.isAuthenticated()) {
     res.json({
       isAuthenticated: true,
@@ -91,7 +99,9 @@ router.get('/logout', (req, res) => {
         return res.status(500).json({ message: 'Error destroying session' });
       }
       // Redirect to frontend after successful logout
-      res.redirect('https://aicgs.netlify.app');
+      res.redirect(process.env.NODE_ENV === 'production'
+        ? 'https://aicgs.netlify.app'
+        : 'http://localhost:5173');
     });
   });
 });
