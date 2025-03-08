@@ -11,7 +11,7 @@ const fetchWithCredentials = async (url, options = {}) => {
     headers: {
       'Accept': 'application/json',
       'Content-Type': 'application/json',
-      'Cache-Control': 'no-cache', // Prevent caching for auth-related requests
+      // Removed Cache-Control header as it's causing CORS issues
     },
   };
 
@@ -150,7 +150,7 @@ export const castVote = async (agentId, selectedTraits) => {
         ? 'http://localhost:5000'
         : 'https://project-aicgs.onrender.com';
         
-      window.location.href = `${authBaseUrl}/api/auth/discord?redirect=https://aicgs.netlify.app/?showVoting=true`;
+      window.location.href = `${authBaseUrl}/api/auth/discord?redirect=https://aicgs.netlify.app/?showVoting=true&t=${Date.now()}`;
       return null;
     }
     

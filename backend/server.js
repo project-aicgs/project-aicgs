@@ -20,7 +20,7 @@ const allowedOrigins = [
 // Trust proxy - required for secure cookies in production
 app.set('trust proxy', 1);
 
-// CORS Configuration
+// CORS Configuration - FIXED to allow cache-control header
 app.use(cors({
   origin: function(origin, callback) {
     // Allow requests with no origin (like mobile apps or curl requests)
@@ -32,13 +32,17 @@ app.use(cors({
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization', 'Cache-Control', 'X-Requested-With', 'Accept'],
+  maxAge: 86400 // 24 hours - caches preflight request results
 }));
+
+// Handle OPTIONS preflight requests explicitly
+app.options('*', cors());
 
 // Body parser middleware
 app.use(express.json());
 
-// Session Configuration - Fixed for mobile
+// Session Configuration
 app.use(session({
   secret: process.env.SESSION_SECRET,
   resave: false,
@@ -50,8 +54,8 @@ app.use(session({
   cookie: {
     secure: process.env.NODE_ENV === 'production', // Secure in production
     sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // Critical for cross-site cookies
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days - extended for better persistence
-    domain: process.env.NODE_ENV === 'production' ? undefined : 'localhost', // Let the browser handle the domain
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    domain: undefined, // Let the browser set the domain based on the request
     path: '/', // Ensure cookie is available for all paths
     httpOnly: true // Safer to prevent JavaScript access
   },
