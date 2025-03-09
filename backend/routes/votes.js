@@ -3,6 +3,7 @@ const router = express.Router();
 const Vote = require('../models/Vote');
 const Agent = require('../models/Agent');
 const Activity = require('../models/Activity');
+const User = require('../models/User'); // Added missing import
 const jwt = require('jsonwebtoken');
 const Token = require('../models/Token');
 
@@ -56,6 +57,7 @@ const isAuthenticated = async (req, res, next) => {
       // Check if the token exists in the database
       const tokenDoc = await Token.findById(decoded.tokenId);
       if (!tokenDoc) {
+        console.log('Token not found in database for tokenId:', decoded.tokenId);
         return res.status(401).json({ 
           message: 'Authentication required',
           code: 'AUTH_REQUIRED',
@@ -66,6 +68,7 @@ const isAuthenticated = async (req, res, next) => {
       // Get the user
       const user = await User.findById(decoded.userId);
       if (!user) {
+        console.log('User not found for userId:', decoded.userId);
         return res.status(401).json({ 
           message: 'Authentication required',
           code: 'AUTH_REQUIRED',
@@ -117,8 +120,8 @@ router.get('/stats', async (req, res) => {
 // Get remaining votes for authenticated user
 router.get('/remaining', isAuthenticated, async (req, res) => {
   try {
-    console.log('Fetching remaining votes for user:', req.user.id);
-    const userVoteCount = await getUserVoteCount(req.user.id);
+    console.log('Fetching remaining votes for user:', req.user._id); // Changed from req.user.id
+    const userVoteCount = await getUserVoteCount(req.user._id); // Changed from req.user.id
     const remainingVotes = 100 - userVoteCount;
     console.log('Remaining votes:', remainingVotes);
     res.json({ remainingVotes });
@@ -134,10 +137,10 @@ router.post('/', isAuthenticated, async (req, res) => {
     const { agentId, selectedTraits } = req.body;
     console.log('Received vote request for agent:', agentId);
     console.log('Selected traits:', selectedTraits);
-    console.log('Authenticated user:', req.user.id);
+    console.log('Authenticated user:', req.user._id); // Changed from req.user.id
 
     // Check user's total vote count
-    const userVoteCount = await getUserVoteCount(req.user.id);
+    const userVoteCount = await getUserVoteCount(req.user._id); // Changed from req.user.id
     console.log('Current vote count for user:', userVoteCount);
     
     if (userVoteCount >= 100) {
@@ -147,7 +150,7 @@ router.post('/', isAuthenticated, async (req, res) => {
     // Check if user has already voted for this agent
     const existingVote = await Vote.findOne({
       agentId,
-      userId: req.user.id
+      userId: req.user._id // Changed from req.user.id
     });
 
     if (existingVote) {
@@ -185,7 +188,7 @@ router.post('/', isAuthenticated, async (req, res) => {
     const vote = new Vote({
       agentId,
       selectedTraits,
-      userId: req.user.id
+      userId: req.user._id // Changed from req.user.id
     });
 
     await vote.save();
@@ -193,7 +196,7 @@ router.post('/', isAuthenticated, async (req, res) => {
 
     // Create activity entry
     const activity = new Activity({
-      userId: req.user.id,
+      userId: req.user._id, // Changed from req.user.id
       agentId,
       activityType: 'VOTE'
     });

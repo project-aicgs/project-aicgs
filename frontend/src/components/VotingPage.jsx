@@ -118,7 +118,24 @@ const VotingPage = ({ onBack = () => {}, onVote = () => {} }) => {
         selectedTraits
       );
       
-      if (response) {  // Only proceed if we got a response (not redirected)
+      // Check for auth error
+      if (response && response.authError) {
+        // Show auth error message but don't redirect immediately
+        setVoteErrors(prev => ({
+          ...prev,
+          [selectedAgent._id]: 'Authentication required. Please login again.'
+        }));
+        setShowConfirmation(false);
+        
+        // Optional: Redirect after a short delay
+        setTimeout(() => {
+          window.location.href = response.redirectTo;
+        }, 1500);
+        
+        return;
+      }
+      
+      if (response) {  // Only proceed if we got a valid response
         await loadAgents();
         await loadRemainingVotes();
         setShowConfirmation(false);

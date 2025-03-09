@@ -74,11 +74,19 @@ const fetchWithAuth = async (url, options = {}) => {
       // Clear invalid token
       setAuthToken(null);
       
-      // Return auth error
+      // Get the API base URL
+      const authBaseUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+        ? 'http://localhost:5000'
+        : 'https://project-aicgs.onrender.com';
+      
+      // Create redirect URL with current page as redirect target
+      const redirectUrl = `${authBaseUrl}/api/auth/discord?redirect=${encodeURIComponent(window.location.href)}&t=${Date.now()}`;
+      
+      // Instead of redirecting immediately, return error object so calling function can decide
       return { 
         authError: true, 
         message: 'Authentication required',
-        redirectTo: `${API_URL.replace('/api', '')}/api/auth/discord?redirect=${encodeURIComponent(window.location.href)}&t=${Date.now()}`
+        redirectTo: redirectUrl
       };
     }
     
@@ -269,25 +277,15 @@ export const castVote = async (agentId, selectedTraits) => {
     
     // Check for auth error response
     if (data.authError) {
-      // Redirect to login
-      window.location.href = data.redirectTo;
-      return null;
+      // Return without redirecting to let calling code decide how to handle it
+      return data;
     }
     
     return data;
   } catch (error) {
     console.error('Error in castVote:', error);
     
-    // If the error is an auth error (401), redirect to login
-    if (error.status === 401) {
-      const authBaseUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-        ? 'http://localhost:5000'
-        : 'https://project-aicgs.onrender.com';
-        
-      window.location.href = `${authBaseUrl}/api/auth/discord?redirect=${encodeURIComponent(window.location.href)}&t=${Date.now()}`;
-      return null;
-    }
-    
+    // Rethrow the error to let the caller handle it
     throw error;
   }
 };

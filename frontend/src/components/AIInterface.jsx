@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Activity, GitBranch, Vote, Book, Twitter, Info, Copy, Menu, X } from 'lucide-react';
+import { Activity, GitBranch, Vote, Book, Twitter, Info, Copy, Menu, X, LogOut } from 'lucide-react';
 import VotingPage from './VotingPage';
 import UserProfile from './UserProfile';
 import RecentActivity from './RecentActivity';
